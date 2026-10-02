@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pizarra Táctica Oficial de Balonmano</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        h1 { margin: 0 0 15px 0; font-size: 24px; }
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 1200px;
+            width: 100%;
+            align-items: stretch;
+        }
+        .canvas-side { display: flex; flex-direction: column; gap: 10px; align-items: center; width: 100%; }
+        .field-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background-color: #252525;
+            padding: 10px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+        .field-label { font-size: 12px; font-weight: bold; color: #bbb; margin-right: 4px; }
+        button.field-btn { background-color: #3a3a3a; border-color: #555; }
+        button.field-btn.active { background-color: #8e44ad; border-color: #bb78d1; }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            background-color: #2d2d2d;
+            padding: 10px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            background-color: #3a3a3a;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        button.active { background-color: #007acc; border-color: #0098ff; }
+        button.btn-clear { background-color: #3a3a3a; border-color: #555; }
+        button.btn-clear.active { background-color: #a93226; border-color: #c0392b; }
+        button.btn-save { background-color: #27ae60; border-color: #2ecc71; }
+        button.btn-save:hover { background-color: #2ea45f; }
+        button.btn-reset { background-color: #7f8c8d; border-color: #95a5a6; }
+        button.btn-reset:hover { background-color: #95a5a6; }
+        
+        #pizarra-svg {
+            background-color: #3b6e51;
+            border: 4px solid white;
+            border-radius: 4px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            touch-action: none;
+        }
+
+        .draggable { cursor: grab; }
+        .draggable:active { cursor: grabbing; }
+        .mode-drawing { cursor: crosshair; }
+        .mode-erasing { cursor: no-drop; }
+
+        .tactical-line { cursor: inherit; pointer-events: stroke; }
+        .mode-erasing .tactical-line:hover { stroke: #e74c3c !important; stroke-width: 6px; cursor: pointer; }
+
+        .description-sidebar {
+            width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            background-color: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .description-sidebar h3 { margin: 0 0 10px 0; color: #007acc; }
+        textarea {
+            width: 100%;
+            height: 130px;
+            background-color: #1e1e1e;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        .text-modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display:flex; align-items:center; justify-content:center; z-index:9999; }
+        .text-modal-box { background:#2d2d2d; padding:20px; border-radius:10px; width:min(360px,90vw); box-shadow:0 10px 30px rgba(0,0,0,.5); }
+        .text-modal-title { font-size:18px; font-weight:bold; margin-bottom:12px; }
+        .text-modal-box input { width:100%; box-sizing:border-box; padding:10px; font-size:18px; background:#1e1e1e; color:white; border:1px solid #666; border-radius:5px; }
+        .text-modal-buttons { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+    </style>
+</head>
+<body>
+
+    <h1>Pizarra de Entrenamiento - Medio Campo</h1>
+
+    <div class="app-container">
+        <div class="canvas-side">
+            <div class="field-controls">
+                <span class="field-label">TIPO DE EJERCICIO</span>
+                <button id="btn-attack" class="field-btn active" onclick="setFieldMode('attack')">⚔️ ATAQUE</button>
+                <button id="btn-defense" class="field-btn" onclick="setFieldMode('defense')">🛡️ DEFENSA</button>
+                <button id="btn-transition" class="field-btn" onclick="setFieldMode('transition')">↔️ TRANSICIÓN</button>
+            </div>
+
+            <div class="controls">
+                <button id="btn-move" class="active" onclick="setMode('move')">🖐️ Mover Fichas</button>
+                <button id="btn-line" onclick="setMode('line')">➖ Desplazamiento</button>
+                <button id="btn-dash" onclick="setMode('dash')">--- Pase</button>
+                <button id="btn-straight" onclick="setMode('straight')">➡️ Trayectoria recta</button>
+                <button id="btn-text" onclick="setMode('text')">🔤 Texto / número</button>
+                <button id="btn-clear" class="btn-clear" onclick="setMode('erase')">🗑️ Modo Borrar</button>
+                <button id="btn-reset" class="btn-reset" onclick="resetDrawing()">↺ Resetear dibujo</button>
+                <button id="btn-save" class="btn-save" onclick="saveAsImage()">💾 Guardar Imagen</button>
+            </div>
+
+            <svg id="pizarra-svg" width="850" height="500" viewBox="0 0 850 500">
+                <defs>
+                    <marker id="arrow-yellow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#ffff00" />
+                    </marker>
+                    <marker id="arrow-pink" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#ff00ff" />
+                    </marker>
+                </defs>
+
+                <!-- Reservas laterales -->
+                <rect x="0" y="0" width="60" height="500" fill="#252526" />
+                <line x1="60" y1="0" x2="60" y2="500" stroke="#555" stroke-width="2" stroke-dasharray="5,5" />
+                <rect x="790" y="0" width="60" height="500" fill="#252526" />
+                <line x1="790" y1="0" x2="790" y2="500" stroke="#555" stroke-width="2" stroke-dasharray="5,5" />
+
+                <!-- Pista -->
+                <line x1="60" y1="4" x2="790" y2="4" stroke="white" stroke-width="4" />
+                <line x1="64" y1="0" x2="64" y2="500" stroke="white" stroke-width="4" />
+                <line x1="786" y1="0" x2="786" y2="500" stroke="white" stroke-width="4" />
+                <line x1="60" y1="496" x2="790" y2="496" stroke="white" stroke-width="4" />
+                <rect x="375" y="-6" width="100" height="10" fill="none" stroke="white" stroke-width="4"/>
+                <path d="M 225,0 A 150,150 0 0,0 375,150 L 475,150 A 150,150 0 0,0 625,0" stroke="white" stroke-width="4" fill="none" />
+                <path d="M 135,0 A 240,240 0 0,0 355,240 L 495,240 A 240,240 0 0,0 715,0" stroke="white" stroke-width="3" stroke-dasharray="12,12" fill="none" />
+                <line x1="410" y1="185" x2="440" y2="185" stroke="white" stroke-width="4" />
+                <line x1="412" y1="100" x2="438" y2="100" stroke="white" stroke-width="3" />
+
+                <!-- CAPA DE LÍNEAS TÁCTICAS -->
+                <g id="lines-group"></g>
+
+                <!-- DEFENSORES -->
+                <g class="draggable" transform="translate(30, 40)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(30, 110)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(30, 180)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(30, 250)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(30, 320)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(30, 390)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+
+                <!-- ATACANTES -->
+                <g class="draggable" transform="translate(820, 40)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(820, 110)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(820, 180)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(820, 250)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(820, 320)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                <g class="draggable" transform="translate(820, 390)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+
+                <!-- BALÓN -->
+                <g class="draggable" transform="translate(820, 450)"><circle r="11" fill="#d35400" stroke="white" stroke-width="2"/></g>
+            </svg>
+        </div>
+
+        <div class="description-sidebar">
+            <h3>Descripción del Ejercicio</h3>
+            <textarea id="exercise-text" placeholder="Escribe aquí la explicación táctica..."></textarea>
+        </div>
+    </div>
+
+    <div id="text-modal" class="text-modal" style="display:none;">
+        <div class="text-modal-box">
+            <div class="text-modal-title">Añadir texto o número</div>
+            <input id="text-input" type="text" maxlength="20" placeholder="Ej.: 1, 2, A, B, CRUCE..." autocomplete="off">
+            <div class="text-modal-buttons">
+                <button type="button" onclick="confirmText()">Aceptar</button>
+                <button type="button" onclick="cancelText()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var svg = document.getElementById('pizarra-svg');
+        var linesGroup = document.getElementById('lines-group');
+        
+        var currentMode = 'move'; 
+        var fieldMode = 'attack';
+        var selectedElement = null;
+        var isDrawing = false;
+        var startX = 0, startY = 0;
+        var activePath = null;
+        var transformX = 0, transformY = 0;
+        var textCounter = 1;
+        var pendingTextX = 0, pendingTextY = 0;
+
+        function setFieldMode(mode) {
+            fieldMode = mode;
+            document.getElementById('btn-attack').classList.toggle('active', mode === 'attack');
+            document.getElementById('btn-defense').classList.toggle('active', mode === 'defense');
+            document.getElementById('btn-transition').classList.toggle('active', mode === 'transition');
+
+            // Al cambiar el tipo de ejercicio empezamos con la pizarra limpia.
+            linesGroup.innerHTML = '';
+            activePath = null;
+            isDrawing = false;
+            selectedElement = null;
+            renderCourt(mode);
+            setMode('move');
+        }
+
+        function renderCourt(mode) {
+            var defs = `
+                <defs>
+                    <marker id="arrow-yellow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="#ffff00" /></marker>
+                    <marker id="arrow-pink" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="#ff00ff" /></marker>
+                </defs>`;
+
+            if (mode === 'transition') {
+                svg.setAttribute('width', '1000');
+                svg.setAttribute('height', '500');
+                svg.setAttribute('viewBox', '0 0 1000 500');
+                svg.innerHTML = defs + `
+                    <rect x="0" y="0" width="1000" height="500" fill="#3b6e51"/>
+                    <!-- Campo completo ligeramente reducido, con las porterías en los extremos izquierdo y derecho -->
+                    <rect x="50" y="30" width="900" height="440" fill="none" stroke="white" stroke-width="4"/>
+                    <line x1="500" y1="30" x2="500" y2="470" stroke="white" stroke-width="4"/>
+                    <!-- Porterías -->
+                    <rect x="40" y="195" width="10" height="110" fill="none" stroke="white" stroke-width="4"/>
+                    <rect x="950" y="195" width="10" height="110" fill="none" stroke="white" stroke-width="4"/>
+                    <!-- Área izquierda: arco de 6 m apoyado en el extremo izquierdo -->
+                    <path d="M 50,130 A 120,120 0 0,1 50,370" fill="none" stroke="white" stroke-width="4"/>
+                    <!-- Línea discontinua de 9 m izquierda -->
+                    <path d="M 50,70 A 180,180 0 0,1 50,430" fill="none" stroke="white" stroke-width="3" stroke-dasharray="12,12"/>
+                    <!-- Área derecha -->
+                    <path d="M 950,130 A 120,120 0 0,0 950,370" fill="none" stroke="white" stroke-width="4"/>
+                    <!-- Línea discontinua de 9 m derecha -->
+                    <path d="M 950,70 A 180,180 0 0,0 950,430" fill="none" stroke="white" stroke-width="3" stroke-dasharray="12,12"/>
+                    <g id="lines-group"></g>
+                    <!-- 6 jugadores azules en el campo izquierdo -->
+                    <g class="draggable" transform="translate(140,150)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(140,350)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(230,120)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(230,250)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(230,380)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(350,250)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                    <!-- 6 jugadores rojos en el campo derecho -->
+                    <g class="draggable" transform="translate(650,250)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(770,120)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(770,250)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(770,380)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(860,150)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(860,350)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                    <g class="draggable" transform="translate(500,250)"><circle r="11" fill="#d35400" stroke="white" stroke-width="2"/></g>`;
+            } else {
+                svg.setAttribute('width', '850');
+                svg.setAttribute('height', '500');
+                svg.setAttribute('viewBox', '0 0 850 500');
+                var rotation = mode === 'defense' ? ' transform="rotate(180 425 250)"' : '';
+                svg.innerHTML = defs + `
+                    <rect x="0" y="0" width="850" height="500" fill="#3b6e51"/>
+                    <g${rotation}>
+                        <rect x="0" y="0" width="60" height="500" fill="#252526" />
+                        <line x1="60" y1="0" x2="60" y2="500" stroke="#555" stroke-width="2" stroke-dasharray="5,5" />
+                        <rect x="790" y="0" width="60" height="500" fill="#252526" />
+                        <line x1="790" y1="0" x2="790" y2="500" stroke="#555" stroke-width="2" stroke-dasharray="5,5" />
+                        <line x1="60" y1="4" x2="790" y2="4" stroke="white" stroke-width="4" />
+                        <line x1="64" y1="0" x2="64" y2="500" stroke="white" stroke-width="4" />
+                        <line x1="786" y1="0" x2="786" y2="500" stroke="white" stroke-width="4" />
+                        <line x1="60" y1="496" x2="790" y2="496" stroke="white" stroke-width="4" />
+                        <rect x="375" y="-6" width="100" height="10" fill="none" stroke="white" stroke-width="4"/>
+                        <path d="M 225,0 A 150,150 0 0,0 375,150 L 475,150 A 150,150 0 0,0 625,0" stroke="white" stroke-width="4" fill="none" />
+                        <path d="M 135,0 A 240,240 0 0,0 355,240 L 495,240 A 240,240 0 0,0 715,0" stroke="white" stroke-width="3" stroke-dasharray="12,12" fill="none" />
+                        <line x1="410" y1="185" x2="440" y2="185" stroke="white" stroke-width="4" />
+                        <line x1="412" y1="100" x2="438" y2="100" stroke="white" stroke-width="3" />
+                        <g id="lines-group"></g>
+                        <g class="draggable" transform="translate(30,40)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(30,110)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(30,180)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(30,250)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(30,320)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(30,390)"><polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(820,40)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(820,110)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(820,180)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(820,250)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(820,320)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(820,390)"><circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/></g>
+                        <g class="draggable" transform="translate(820,450)"><circle r="11" fill="#d35400" stroke="white" stroke-width="2"/></g>
+                    </g>`;
+            }
+            linesGroup = document.getElementById('lines-group');
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            var buttons = document.querySelectorAll('.controls button');
+            for (var i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove('active');
+            }
+            
+            svg.classList.remove('mode-drawing', 'mode-erasing');
+            
+            if (mode === 'move') {
+                document.getElementById('btn-move').classList.add('active');
+            } else if (mode === 'erase') {
+                document.getElementById('btn-clear').classList.add('active');
+                svg.classList.add('mode-erasing');
+            } else {
+                if (mode === 'line') document.getElementById('btn-line').classList.add('active');
+                if (mode === 'dash') document.getElementById('btn-dash').classList.add('active');
+                if (mode === 'straight') document.getElementById('btn-straight').classList.add('active');
+                if (mode === 'text') document.getElementById('btn-text').classList.add('active');
+                svg.classList.add('mode-drawing');
+            }
+        }
+
+        function getSVGCoords(e) {
+            var rect = svg.getBoundingClientRect();
+            var clientX = e.clientX;
+            var clientY = e.clientY;
+
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            }
+
+            var vb = svg.viewBox.baseVal;
+            var x = ((clientX - rect.left) / rect.width) * vb.width + vb.x;
+            var y = ((clientY - rect.top) / rect.height) * vb.height + vb.y;
+
+            // En modo DEFENSA el contenido del campo está girado 180º.
+            // Las fichas y las líneas viven en las coordenadas del grupo girado,
+            // por lo que convertimos la posición del ratón a esas coordenadas
+            // antes de mover o dibujar.
+            if (fieldMode === 'defense') {
+                x = 850 - x;
+                y = 500 - y;
+            }
+
+            return { x: x, y: y };
+        }
+
+        function handleStart(e) {
+            var coords = getSVGCoords(e);
+            
+            if (currentMode === 'move') {
+                var targetG = e.target.closest('.draggable');
+                if (targetG) {
+                    selectedElement = targetG;
+                    var transform = selectedElement.getAttribute('transform') || '';
+                    var match = transform.match(/translate\(([^,)\s]+)[, ]+([^)\s]+)\)/) || transform.match(/translate\(([^,)]+)\s+([^)]+)\)/);
+                    var currentX = 0, currentY = 0;
+                    if (match && match.length >= 3) {
+                        currentX = parseFloat(match[1]);
+                        currentY = parseFloat(match[2]);
+                    } else if (selectedElement.classList.contains('tactical-text')) {
+                        currentX = parseFloat(selectedElement.getAttribute('x')) || 0;
+                        currentY = parseFloat(selectedElement.getAttribute('y')) || 0;
+                    }
+                    transformX = coords.x - currentX;
+                    transformY = coords.y - currentY;
+                    svg.appendChild(selectedElement);
+                }
+            } else if (currentMode === 'erase') {
+                // En modo borrar se pueden retirar tanto las trayectorias como las fichas
+                // (incluido el balón) para dejar el campo completamente vacío.
+                var eraseTarget = e.target.closest('.tactical-line, .draggable');
+                if (eraseTarget) {
+                    eraseTarget.remove();
+                }
+            } else if (currentMode === 'text') {
+                pendingTextX = coords.x;
+                pendingTextY = coords.y;
+                openTextModal();
+                return;
+            } else {
+                isDrawing = true;
+                startX = coords.x;
+                startY = coords.y;
+
+                activePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                activePath.classList.add('tactical-line');
+                activePath.setAttribute("fill", "none");
+                activePath.setAttribute("stroke", (currentMode === 'line' || currentMode === 'straight') ? "#ffff00" : "#ff00ff");
+                activePath.setAttribute("stroke-width", "4");
+                activePath.setAttribute("stroke-linecap", "round");
+                
+                if (currentMode === 'dash') {
+                    activePath.setAttribute("stroke-dasharray", "10,10");
+                }
+                linesGroup.appendChild(activePath);
+                updateCurve(startX, startY);
+            }
+        }
+
+        function openTextModal() {
+            var modal = document.getElementById('text-modal');
+            var input = document.getElementById('text-input');
+            modal.style.display = 'flex';
+            input.value = '';
+            setTimeout(function() { input.focus(); }, 50);
+        }
+
+        function cancelText() {
+            document.getElementById('text-modal').style.display = 'none';
+            setMode('text');
+        }
+
+        function confirmText() {
+            var input = document.getElementById('text-input');
+            var textValue = input.value.trim();
+            if (textValue) {
+                var textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                textEl.classList.add('draggable', 'tactical-text');
+                textEl.setAttribute('x', pendingTextX);
+                textEl.setAttribute('y', pendingTextY);
+                textEl.setAttribute('fill', '#ffffff');
+                textEl.setAttribute('font-size', '22');
+                textEl.setAttribute('font-family', 'Arial, sans-serif');
+                textEl.setAttribute('font-weight', 'bold');
+                textEl.setAttribute('text-anchor', 'middle');
+                textEl.setAttribute('dominant-baseline', 'middle');
+                textEl.textContent = textValue;
+                linesGroup.appendChild(textEl);
+            }
+            document.getElementById('text-modal').style.display = 'none';
+            setMode('text');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            var modal = document.getElementById('text-modal');
+            if (modal.style.display === 'flex') {
+                if (e.key === 'Enter') { e.preventDefault(); confirmText(); }
+                if (e.key === 'Escape') { e.preventDefault(); cancelText(); }
+            }
+        });
+
+        function handleMove(e) {
+            var coords = getSVGCoords(e);
+
+            if (selectedElement && currentMode === 'move') {
+                var newX = coords.x - transformX;
+                var newY = coords.y - transformY;
+                var maxX = fieldMode === 'transition' ? 985 : 835;
+                var maxY = 485;
+                if (newX < 15) newX = 15; if (newX > maxX) newX = maxX;
+                if (newY < 15) newY = 15; if (newY > maxY) newY = maxY;
+                if (selectedElement.classList.contains('tactical-text')) {
+                    selectedElement.setAttribute('x', newX);
+                    selectedElement.setAttribute('y', newY);
+                } else {
+                    selectedElement.setAttribute('transform', 'translate(' + newX + ', ' + newY + ')');
+                }
+            } else if (isDrawing && activePath) {
+                updateCurve(coords.x, coords.y);
+            }
+        }
+
+        function updateCurve(endX, endY) {
+            // TRAYECTORIA RECTA: línea continua y recta.
+            if (currentMode === 'straight') {
+                activePath.setAttribute('d',
+                    'M ' + startX + ' ' + startY + ' L ' + endX + ' ' + endY);
+                return;
+            }
+
+            // DESPLAZAMIENTO: línea continua y curvable.
+            if (currentMode === 'line') {
+                var dx = endX - startX;
+                var dy = endY - startY;
+                var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                var nx = -dy / dist;
+                var ny = dx / dist;
+
+                // Curvatura hacia el interior del campo.
+                var midX = (startX + endX) / 2;
+                var midY = (startY + endY) / 2;
+                var centerX = fieldMode === 'transition' ? 500 : 425;
+                var toCenterX = centerX - midX;
+                var toCenterY = 250 - midY;
+                if (nx * toCenterX + ny * toCenterY < 0) {
+                    nx = -nx;
+                    ny = -ny;
+                }
+
+                var bend = Math.min(120, Math.max(55, dist * 0.30));
+                var c1X = startX + dx * 0.38 + nx * bend;
+                var c1Y = startY + dy * 0.38 + ny * bend;
+
+                // La punta final encara hacia portería.
+                var goalX = fieldMode === 'transition' ? (endX < 500 ? 50 : 950) : (fieldMode === 'defense' ? 425 : 425);
+                var goalY = fieldMode === 'transition' ? 250 : (fieldMode === 'defense' ? 500 : 0);
+                var gx = goalX - endX;
+                var gy = goalY - endY;
+                var gLen = Math.sqrt(gx * gx + gy * gy) || 1;
+                gx /= gLen;
+                gy /= gLen;
+                var tangentLength = Math.max(55, Math.min(120, gLen * 0.25));
+                var c2X = endX - gx * tangentLength;
+                var c2Y = endY - gy * tangentLength;
+
+                var dData = 'M ' + startX + ' ' + startY +
+                            ' C ' + c1X + ' ' + c1Y +
+                            ', ' + c2X + ' ' + c2Y +
+                            ', ' + endX + ' ' + endY;
+                activePath.setAttribute('d', dData);
+                return;
+            }
+
+            // PASE: línea discontinua y recta.
+            activePath.setAttribute('d',
+                'M ' + startX + ' ' + startY + ' L ' + endX + ' ' + endY);
+        }
+
+        function resetDrawing() {
+            // Borra todas las trayectorias dibujadas, pero mantiene las fichas y la descripción.
+            linesGroup.innerHTML = "";
+            activePath = null;
+            isDrawing = false;
+            selectedElement = null;
+            setMode("move");
+        }
+
+        function handleEnd() {
+            if (isDrawing && activePath) {
+                if (currentMode === 'line' || currentMode === 'straight') {
+                    activePath.setAttribute("marker-end", "url(#arrow-yellow)");
+                } else if (currentMode === 'dash') {
+                    activePath.setAttribute("marker-end", "url(#arrow-pink)");
+                }
+            }
+            selectedElement = null;
+            isDrawing = false;
+            activePath = null;
+        }
+
+        renderCourt('attack');
+
+        svg.addEventListener('mousedown', handleStart);
+        svg.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+
+        svg.addEventListener('touchstart', handleStart, {passive: true});
+        svg.addEventListener('touchmove', function(e) { handleMove(e); if(currentMode !== 'move') e.preventDefault(); }, {passive: false});
+        window.addEventListener('touchend', handleEnd);
+
+        function saveAsImage() {
+            var svgData = new XMLSerializer().serializeToString(svg);
+            var canvas = document.createElement("canvas");
+            var description = document.getElementById("exercise-text").value.trim();
+            var descLines = [];
+            var imageWidth = fieldMode === 'transition' ? 1000 : 850;
+            var imageHeight = 500;
+            var maxWidth = imageWidth - 60;
+            var font = "16px Arial";
+            var lineHeight = 24;
+
+            // Preparar el texto para que se ajuste al ancho de la imagen.
+            var measureCanvas = document.createElement("canvas");
+            var measureCtx = measureCanvas.getContext("2d");
+            measureCtx.font = font;
+            if (description) {
+                var paragraphs = description.split(/\r?\n/);
+                paragraphs.forEach(function(paragraph) {
+                    if (!paragraph.trim()) { descLines.push(""); return; }
+                    var words = paragraph.split(/\s+/);
+                    var line = "";
+                    words.forEach(function(word) {
+                        var test = line ? line + " " + word : word;
+                        if (measureCtx.measureText(test).width > maxWidth && line) {
+                            descLines.push(line);
+                            line = word;
+                        } else {
+                            line = test;
+                        }
+                    });
+                    if (line) descLines.push(line);
+                });
+            }
+
+            var descHeight = description ? Math.max(90, 55 + descLines.length * lineHeight) : 70;
+            canvas.width = imageWidth;
+            canvas.height = imageHeight + descHeight;
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#3b6e51";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            var img = new Image();
+            img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0);
+                if (description) {
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(0, imageHeight, imageWidth, descHeight);
+                    ctx.fillStyle = "#222222";
+                    ctx.font = "bold 16px Arial";
+                    ctx.fillText("Descripción del ejercicio", 30, imageHeight + 28);
+                    ctx.font = font;
+                    var y = imageHeight + 54;
+                    descLines.forEach(function(line) {
+                        ctx.fillText(line, 30, y);
+                        y += lineHeight;
+                    });
+                }
+
+                var a = document.createElement("a");
+                a.download = "ejercicio_balonmano.png";
+                a.href = canvas.toDataURL("image/png");
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            };
+        }
+    </script>
+</body>
+</html>

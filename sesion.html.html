@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full de Sessió d'Entrenament Oficial - Handbol</title>
+    <style>
+        :root {
+            --primary: #007acc;
+            --border-color: #222;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #e9ecef;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* Full DIN A4 Vertical adaptat */
+        .session-sheet {
+            background-color: white;
+            max-width: 1050px;
+            margin: 0 auto;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            box-sizing: border-box;
+        }
+
+        /* Títol Principal */
+        .main-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin: 0 0 15px 0;
+            padding: 8px;
+            background-color: #222;
+            color: white;
+            border: 2px solid var(--border-color);
+        }
+
+        /* Taula de Capçalera */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .header-table td {
+            border: 2px solid var(--border-color);
+            padding: 8px 12px;
+            font-size: 13px;
+            vertical-align: middle;
+        }
+
+        .bg-gray {
+            background-color: #f1f2f6;
+            font-weight: bold;
+        }
+
+        /* Caselles de selecció (Ataque, Defensa...) */
+        .pillar-group {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .pillar-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .pillar-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .editable-field {
+            font-weight: bold;
+            color: var(--primary);
+            border: none;
+            font-family: inherit;
+            font-size: 13px;
+            width: 100%;
+            background: transparent;
+            box-sizing: border-box;
+        }
+        .editable-field:focus { outline: 1px dashed var(--primary); }
+
+        /* Títol Secció Desenvolupament */
+        .section-divider {
+            background-color: #e4e4e4;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            padding: 6px;
+            border: 2px solid var(--border-color);
+            border-bottom: none;
+            margin-top: 10px;
+        }
+
+        /* GRAELLA D'EXERCICIS EN 2 COLUMNES (Fins a 4 exercicis) */
+        .exercise-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            page-break-inside: avoid; /* Evita talls en passar a PDF */
+        }
+
+        .exercise-table th {
+            border: 2px solid var(--border-color);
+            background-color: #f1f2f6;
+            padding: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .exercise-table td {
+            border: 2px solid var(--border-color);
+            vertical-align: top;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+
+        /* Mides optimitzades: Gràfic gran (65%) i Consignes (35%) */
+        .col-graph { width: 65%; text-align: center; background-color: #fafafa; position: relative; }
+        .col-orient { width: 35%; padding: 10px !important; }
+
+        /* Contenidor per pujar la imatge de la pissarra */
+        .image-uploader {
+            width: 100%;
+            min-height: 380px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .image-uploader input[type="file"] {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 5;
+        }
+
+        .placeholder-text {
+            color: #777;
+            font-size: 13px;
+            padding: 10px;
+            pointer-events: none;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .loaded-image {
+            width: 100%;
+            height: auto;
+            max-height: 450px;
+            object-fit: contain;
+            display: none;
+        }
+
+        /* Àrea de text per a consignes i orientacions */
+        .exercise-table textarea {
+            width: 100%;
+            height: 360px;
+            border: none;
+            resize: none;
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #333;
+            background: transparent;
+            box-sizing: border-box;
+        }
+        .exercise-table textarea:focus { outline: none; }
+
+        /* Barra d'acció flotant (Només pantalla) */
+        .action-bar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .btn-pdf {
+            padding: 12px 25px;
+            font-size: 14px;
+            font-weight: bold;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .btn-pdf:hover { background-color: #2ea45f; }
+
+        /* CONFIGURACIÓ NETEJA PER AL PDF */
+        @media print {
+            body { background-color: white; padding: 0; }
+            .session-sheet { box-shadow: none; border: none; padding: 0; max-width: 100%; }
+            .action-bar, .placeholder-text { display: none !important; }
+            .editable-field { color: #000 !important; }
+            .exercise-table td { background-color: transparent !important; }
+            textarea { border: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="session-sheet">
+        <!-- TÍTOL OFICIAL -->
+        <div class="main-title">HOJA DE SESIÓN DE ENTRENAMIENTO</div>
+
+        <!-- CAPÇALERA DE CONTROL -->
+        <table class="header-table">
+            <tr>
+                <td width="15%" class="bg-gray">Sesión número</td>
+                <td width="15%"><input type="text" class="editable-field" placeholder="Ex: 24" value="1"></td>
+                <td width="10%" class="bg-gray">Fecha</td>
+                <td width="20%"><input type="text" class="editable-field" placeholder="Ex: 02/10/2026" value="02/10/2026"></td>
+                <td width="15%" class="bg-gray">Nº asistente</td>
+                <td width="25%"><input type="text" class="editable-field" placeholder="Ex: 14" value="14"></td>
+            </tr>
+            <tr>
+                <td class="bg-gray">Bloque / Objetivos</td>
+                <td colspan="5"><input type="text" class="editable-field" placeholder="Ex: Treball de fixació interior i continuïtat" style="font-weight:normal;"></td>
+            </tr>
+            <tr>
+                <td class="bg-gray">Tipo de sesión</td>
+                <td colspan="5">
+                    <div class="pillar-group">
+                        <label class="pillar-item"><input type="checkbox"> ATAQUE</label>
+                        <label class="pillar-item"><input type="checkbox"> DEFENSA</label>
+                        <label class="pillar-item"><input type="checkbox"> TRANSICIÓN</label>
+                        <label class="pillar-item"><input type="checkbox"> CONDICIONAL</label>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- SECCIÓ DE DESENVOLUPAMENT -->
+        <div class="section-divider">Desarrollo de los ejercicios</div>
+
+        <!-- EXERCICI 1 -->
+        <table class="exercise-table">
+            <thead>
+                <tr>
+                    <th width="65%">Gráfico (Incluye descripción)</th>
+                    <th width="35%">Orientaciones/consignas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="col-graph">
+                        <div class="image-uploader">
+                            <span class="placeholder-text">🖼 *EXERCICI 1*<br>Clica per carregar la imatge de la Pissarra</span>
+                            <input type="file" accept="image/*" onchange="loadImage(event, this)">
+                            <img class="loaded-image" alt="Gràfic 1">
+                        </div>
+                    </td>
+                    <td class="col-orient">
+                        <textarea placeholder="Consignes tècniques/tàctiques per a l'exercici 1..."></textarea>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- EXERCICI 2 -->
+        <table class="exercise-table">
+            <thead>
+                <tr>
+                    <th width="65%">Gráfico (Incluye descripción)</th>
+                    <th width="35%">Orientaciones/consignas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="col-graph">
+                        <div class="image-uploader">
+                            <span class="placeholder-text">🖼 *EXERCICI 2*<br>Clica per carregar la imatge de la Pissarra</span>
+                            <input type="file" accept="image/*" onchange="loadImage(event, this)">
+                            <img class="loaded-image" alt="Gràfic 2">
+                        </div>
+                    </td>
+                    <td class="col-orient">
