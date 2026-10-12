@@ -64,6 +64,7 @@
         button.btn-save { background-color: #27ae60; border-color: #2ecc71; }
         button.btn-undo { background-color: #f39c12; border-color: #e67e22; }
         button.btn-pdf { background-color: #8e44ad; border-color: #9b59b6; }
+        button.btn-html { background-color: #c0392b; border-color: #e74c3c; }
 
         .ex-count-input {
             width: 50px;
@@ -313,7 +314,8 @@
             <button id="btn-reset" onclick="resetDrawing()">↺ Limpiar</button>
             <button id="btn-save" class="btn-save" onclick="saveAsImage()">💾 IMG</button>
             <button class="btn-pdf" onclick="exportPDF()">📄 PDF</button>
-            <button class="btn-save" onclick="saveToRepository()" style="background-color:#2980b9;border-color:#3498db;">📚 Repositorio</button>
+            <button class="btn-html" onclick="saveSessionAsHTML()">🌐 HTML</button>
+            <button class="btn-save" onclick="saveToRepository()" style="background-color:#2980b9;border-color:#3498db;">📚 Repo</button>
         </div>
 
         <div class="controls" style="justify-content:space-between;align-items:center;">
@@ -808,6 +810,852 @@
             });
         }
 
+        /* ===== GUARDAR SESIÓN COMPLETA COMO HTML (PIZARRA + HOJA) ===== */
+        function saveSessionAsHTML() {
+            // 1. Capturar el estado actual del SVG completo (con fichas movidas y trayectorias)
+            const svgActual = svg.outerHTML;
+            
+            // 2. Capturar valores de la hoja de sesión
+            const datosHoja = {
+                inputs: [],
+                checkboxes: [],
+                textareas: [],
+                imagenes: [],
+                exCount: document.getElementById('ex-count').value,
+                exerciseText: document.getElementById('exercise-text').value
+            };
+            
+            // Inputs editables
+            document.querySelectorAll('input.editable-field').forEach(input => {
+                datosHoja.inputs.push(input.value || '');
+            });
+            
+            // Checkboxes
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                datosHoja.checkboxes.push(cb.checked);
+            });
+            
+            // Textareas de la hoja
+            document.querySelectorAll('#hoja textarea').forEach(ta => {
+                datosHoja.textareas.push(ta.value || '');
+            });
+            
+            // Imágenes cargadas
+            document.querySelectorAll('.loaded-image').forEach(img => {
+                if (img.style.display === 'block') {
+                    datosHoja.imagenes.push(img.src);
+                } else {
+                    datosHoja.imagenes.push(null);
+                }
+            });
+
+            // 3. Construir nombre del archivo
+            const numSesion = (datosHoja.inputs[0] || 'X').trim();
+            const fecha = (datosHoja.inputs[1] || '').trim();
+            let fechaTxt = fecha.replace(/[^\w\-]+/g, '-');
+            if (!fechaTxt) fechaTxt = new Date().toISOString().slice(0,10);
+            const nombreArchivo = `Sesion_${numSesion}_${fechaTxt}.html`;
+
+            // 4. Generar HTML completo autocontenido con script de restauración
+            const htmlCompleto = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>${nombreArchivo.replace('.html','')}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+    <style>
+        :root { --primary: #007acc; --border-color: #222; --bg-dark: #1e1e1e; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #e9ecef;
+            color: #333;
+            margin: 0;
+            padding: 10px;
+            overscroll-behavior: none;
+        }
+        #generator {
+            background-color: var(--bg-dark);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto 30px auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+        }
+        #generator h1 {
+            text-align: center;
+            font-size: 1.4rem;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .controls, .field-controls {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            background-color: #2d2d2d;
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .field-controls { background-color: #252525; }
+        button {
+            padding: 10px 8px;
+            font-size: 13px;
+            cursor: pointer;
+            background-color: #3a3a3a;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 6px;
+            font-weight: bold;
+            flex: 1;
+            min-width: 70px;
+            touch-action: manipulation;
+        }
+        button.active { background-color: #007acc; border-color: #0098ff; }
+        button.btn-clear.active { background-color: #a93226; border-color: #c0392b; }
+        button.btn-save { background-color: #27ae60; border-color: #2ecc71; }
+        button.btn-undo { background-color: #f39c12; border-color: #e67e22; }
+        button.btn-pdf { background-color: #8e44ad; border-color: #9b59b6; }
+        button.btn-html { background-color: #c0392b; border-color: #e74c3c; }
+        .ex-count-input {
+            width: 50px;
+            padding: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            background: #3a3a3a;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .svg-wrapper {
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            background-color: #3b6e51;
+            border: 3px solid white;
+            border-radius: 4px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            touch-action: none;
+            overflow: hidden;
+            position: relative;
+        }
+        svg {
+            width: 100%;
+            height: auto;
+            display: block;
+            max-width: 100%;
+        }
+        .draggable { cursor: grab; }
+        .draggable:active { cursor: grabbing; }
+        .touch-area { fill: transparent; pointer-events: all; }
+        .mode-drawing { cursor: crosshair; }
+        .mode-erasing { cursor: no-drop; }
+        .mode-erasing .tactical-line:hover,
+        .mode-erasing .draggable:hover { opacity: 0.5; }
+        .description-sidebar {
+            width: 100%;
+            max-width: 100%;
+            margin: 15px auto 0;
+            background-color: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .description-sidebar textarea {
+            width: 100%;
+            height: 100px;
+            background-color: #1e1e1e;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 14px;
+            resize: vertical;
+        }
+        .zoom-hint {
+            text-align: center;
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        .session-sheet {
+            background-color: white;
+            width: 100%;
+            max-width: 1050px;
+            margin: 30px auto;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+        .main-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 8px;
+            background-color: #222;
+            color: white;
+            border: 2px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .header-table td {
+            border: 2px solid var(--border-color);
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+        .bg-gray { background-color: #f1f2f6; font-weight: bold; }
+        .editable-field {
+            font-weight: bold;
+            color: var(--primary);
+            border: none;
+            font-family: inherit;
+            font-size: 13px;
+            width: 100%;
+            background: transparent;
+        }
+        .editable-field:focus { outline: 1px dashed var(--primary); }
+        .exercise-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+        .exercise-table th {
+            border: 2px solid var(--border-color);
+            background-color: #f1f2f6;
+            padding: 6px;
+            font-size: 13px;
+            text-align: center;
+        }
+        .exercise-table td {
+            border: 2px solid var(--border-color);
+            vertical-align: top;
+            padding: 5px;
+        }
+        .col-graph { width: 65%; text-align: center; background-color: #fafafa; }
+        .col-orient { width: 35%; }
+        .image-uploader {
+            width: 100%;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+        }
+        .image-uploader input[type="file"] {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 5;
+        }
+        .placeholder-text {
+            color: #777;
+            font-size: 13px;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        .loaded-image {
+            width: 100%;
+            height: auto;
+            max-height: 300px;
+            object-fit: contain;
+            display: none;
+        }
+        .exercise-table textarea {
+            width: 100%;
+            height: 200px;
+            border: none;
+            resize: none;
+            font-family: inherit;
+            font-size: 13px;
+            background: transparent;
+        }
+        .text-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .text-modal-box {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 360px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.5);
+        }
+        .text-modal-box input {
+            width: 100%;
+            padding: 10px;
+            font-size: 18px;
+            background: #1e1e1e;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        @media print {
+            @page { size: A4; margin: 10mm; }
+            body { background-color: white; padding: 0; }
+            #generator, .placeholder-text, .zoom-hint { display: none !important; }
+            .session-sheet {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+                max-width: 100%;
+                margin: 0;
+            }
+            .exercise-table textarea { height: 150px; }
+        }
+        @media (max-width: 600px) {
+            .controls button { font-size: 11px; padding: 8px 4px; min-width: 60px; }
+            .field-controls button { font-size: 11px; padding: 8px 4px; }
+            #generator h1 { font-size: 1.2rem; }
+            .main-title { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="generator">
+        <h1>PIZARRA DE ENTRENAMIENTO</h1>
+        <div class="field-controls">
+            <button id="btn-attack" class="active" onclick="setFieldMode('attack')">⚔️ ATAQUE</button>
+            <button id="btn-defense" onclick="setFieldMode('defense')">🛡️ DEFENSA</button>
+            <button id="btn-transition" onclick="setFieldMode('transition')">↔️ TRANSICIÓN</button>
+        </div>
+        <div class="controls">
+            <button id="btn-move" class="active" onclick="setMode('move')">🖐️ Mover</button>
+            <button id="btn-line" onclick="setMode('line')">➖ Despl.</button>
+            <button id="btn-dash" onclick="setMode('dash')">--- Pase</button>
+            <button id="btn-straight" onclick="setMode('straight')">➡️ Recta</button>
+            <button id="btn-shot" onclick="setMode('shot')">🎯 Tiro</button>
+            <button id="btn-text" onclick="setMode('text')">🔤 Texto</button>
+            <button id="btn-clear" class="btn-clear" onclick="setMode('erase')">🗑️ Borrar</button>
+            <button class="btn-undo" onclick="undo()">↩ Deshacer</button>
+        </div>
+        <div class="controls">
+            <button id="btn-reset" onclick="resetDrawing()">↺ Limpiar</button>
+            <button id="btn-save" class="btn-save" onclick="saveAsImage()">💾 IMG</button>
+            <button class="btn-pdf" onclick="exportPDF()">📄 PDF</button>
+            <button class="btn-html" onclick="saveSessionAsHTML()">🌐 HTML</button>
+            <button class="btn-save" onclick="saveToRepository()" style="background-color:#2980b9;border-color:#3498db;">📚 Repo</button>
+        </div>
+        <div class="controls" style="justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;font-weight:bold;color:#bbb;">Nº EJERCICIOS:</span>
+            <input type="number" id="ex-count" class="ex-count-input" value="${datosHoja.exCount}" min="1" max="12" onchange="updateExerciseCount()">
+            <span style="font-size:12px;font-weight:bold;color:#bbb;margin-left:10px;">ENVIAR A:</span>
+            <select id="target-ex" style="padding:8px;background:#3a3a3a;color:white;border:1px solid #555;border-radius:4px;flex:1;margin:0 8px;"></select>
+            <button class="btn-save" onclick="sendToSheet()" style="flex:1;">📤 Enviar</button>
+        </div>
+        <div class="svg-wrapper">
+            ${svgActual}
+        </div>
+        <div class="zoom-hint">💡 Usa dos dedos sobre la pantalla para hacer zoom si necesitas más detalle</div>
+        <div class="description-sidebar">
+            <h3 style="margin-top:0;color:#007acc;font-size:1rem;">Descripción del Ejercicio</h3>
+            <textarea id="exercise-text" placeholder="Escribe aquí la explicación táctica, consignas o variantes..."></textarea>
+        </div>
+    </div>
+    <div id="text-modal" class="text-modal" style="display:none;">
+        <div class="text-modal-box">
+            <div style="font-size:18px;font-weight:bold;margin-bottom:12px;">Añadir texto o número</div>
+            <input id="text-input" type="text" maxlength="20" placeholder="Ej.: 1, 2, CRUCE..." autocomplete="off">
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+                <button type="button" onclick="confirmText()">Aceptar</button>
+                <button type="button" onclick="cancelText()" style="background-color:#7f8c8d;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+    <div class="session-sheet" id="hoja">
+        <div class="main-title">HOJA DE SESIÓN</div>
+        <table class="header-table">
+            <tr>
+                <td class="bg-gray" width="15%">Sesión nº</td>
+                <td width="15%"><input class="editable-field" type="text" placeholder="Ej: 12"></td>
+                <td class="bg-gray" width="15%">Fecha</td>
+                <td width="20%"><input class="editable-field" type="text" placeholder="DD/MM/AAAA"></td>
+                <td class="bg-gray" width="15%">Asistentes</td>
+                <td width="20%"><input class="editable-field" type="text" placeholder="00"></td>
+            </tr>
+            <tr>
+                <td class="bg-gray">Bloque / Objetivos</td>
+                <td colspan="5"><input class="editable-field" type="text" placeholder="Ej: Mejora del bloqueo directo y finalización"></td>
+            </tr>
+            <tr>
+                <td class="bg-gray">Tipo</td>
+                <td colspan="5">
+                    <label><input type="checkbox"> ATAQUE</label> &nbsp;
+                    <label><input type="checkbox"> DEFENSA</label> &nbsp;
+                    <label><input type="checkbox"> TRANSICIÓN</label> &nbsp;
+                    <label><input type="checkbox"> CONDICIONAL</label>
+                </td>
+            </tr>
+        </table>
+        <div id="exercises-container"></div>
+    </div>
+    <script>
+        // Datos de la sesión guardada
+        var datosSesion = ${JSON.stringify(datosHoja)};
+        
+        var svg = document.getElementById('pizarra-svg');
+        var courtGroup = document.getElementById('court-group');
+        var linesGroup = document.getElementById('lines-group');
+        var currentMode = 'move';
+        var fieldMode = 'attack';
+        var selectedElement = null;
+        var isDrawing = false;
+        var startX = 0, startY = 0;
+        var activePath = null;
+        var transformX = 0, transformY = 0;
+        var pendingTextX = 0, pendingTextY = 0;
+        var undoStack = [];
+
+        function init() {
+            // Restaurar estado de la pizarra (el SVG ya está en el HTML)
+            courtGroup = document.getElementById('court-group');
+            linesGroup = document.getElementById('lines-group');
+            
+            // Generar ejercicios según el número guardado
+            updateExerciseCount();
+            
+            // Restaurar valores de la hoja
+            document.querySelectorAll('input.editable-field').forEach((input, i) => {
+                if (datosSesion.inputs[i] !== undefined) input.value = datosSesion.inputs[i];
+            });
+            
+            document.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
+                if (datosSesion.checkboxes[i] !== undefined) cb.checked = datosSesion.checkboxes[i];
+            });
+            
+            document.querySelectorAll('#hoja textarea').forEach((ta, i) => {
+                if (datosSesion.textareas[i] !== undefined) ta.value = datosSesion.textareas[i];
+            });
+            
+            document.querySelectorAll('.loaded-image').forEach((img, i) => {
+                if (datosSesion.imagenes[i]) {
+                    img.src = datosSesion.imagenes[i];
+                    img.style.display = 'block';
+                    const placeholder = img.parentElement.querySelector('.placeholder-text');
+                    if (placeholder) placeholder.style.display = 'none';
+                }
+            });
+            
+            document.getElementById('exercise-text').value = datosSesion.exerciseText || '';
+
+            svg.addEventListener('mousedown', handleStart);
+            svg.addEventListener('mousemove', handleMove);
+            window.addEventListener('mouseup', handleEnd);
+            svg.addEventListener('touchstart', handleStart, {passive: false});
+            svg.addEventListener('touchmove', handleMove, {passive: false});
+            window.addEventListener('touchend', handleEnd);
+
+            document.addEventListener('keydown', function(e) {
+                var modal = document.getElementById('text-modal');
+                if (modal.style.display === 'flex') {
+                    if (e.key === 'Enter') { e.preventDefault(); confirmText(); }
+                    if (e.key === 'Escape') { e.preventDefault(); cancelText(); }
+                }
+            });
+        }
+
+        function updateExerciseCount() {
+            var input = document.getElementById('ex-count');
+            var count = parseInt(input.value, 10);
+            if (isNaN(count) || count < 1) count = 1;
+            if (count > 12) count = 12;
+            input.value = count;
+            generateExerciseSlots(count);
+        }
+
+        function renderCourt(mode) {
+            fieldMode = mode;
+            document.getElementById('btn-attack').classList.toggle('active', mode === 'attack');
+            document.getElementById('btn-defense').classList.toggle('active', mode === 'defense');
+            document.getElementById('btn-transition').classList.toggle('active', mode === 'transition');
+            linesGroup.innerHTML = '';
+            undoStack = [];
+            activePath = null;
+            isDrawing = false;
+            selectedElement = null;
+
+            if (mode === 'transition') {
+                svg.setAttribute('viewBox', '0 0 1000 500');
+                courtGroup.innerHTML = '<rect x="0" y="0" width="1000" height="500" fill="#3b6e51"/><rect x="50" y="30" width="900" height="440" fill="none" stroke="white" stroke-width="4"/><line x1="500" y1="30" x2="500" y2="470" stroke="white" stroke-width="4"/><rect x="40" y="195" width="10" height="110" fill="none" stroke="white" stroke-width="4"/><rect x="950" y="195" width="10" height="110" fill="none" stroke="white" stroke-width="4"/><path d="M 50,130 A 120,120 0 0,1 50,370" fill="none" stroke="white" stroke-width="4"/><path d="M 50,70 A 180,180 0 0,1 50,430" fill="none" stroke="white" stroke-width="3" stroke-dasharray="12,12"/><path d="M 950,130 A 120,120 0 0,0 950,370" fill="none" stroke="white" stroke-width="4"/><path d="M 950,70 A 180,180 0 0,0 950,430" fill="none" stroke="white" stroke-width="3" stroke-dasharray="12,12"/>';
+                createPieces([{x:140,y:150,type:'tri'},{x:140,y:350,type:'tri'},{x:230,y:120,type:'tri'},{x:230,y:250,type:'tri'},{x:230,y:380,type:'tri'},{x:350,y:250,type:'tri'},{x:650,y:250,type:'cir'},{x:770,y:120,type:'cir'},{x:770,y:250,type:'cir'},{x:770,y:380,type:'cir'},{x:860,y:150,type:'cir'},{x:860,y:350,type:'cir'},{x:500,y:250,type:'ball'}]);
+            } else {
+                svg.setAttribute('viewBox', '0 0 850 500');
+                var rotation = mode === 'defense' ? ' transform="rotate(180 425 250)"' : '';
+                courtGroup.innerHTML = '<rect x="0" y="0" width="850" height="500" fill="#3b6e51"/><g' + rotation + '><rect x="0" y="0" width="60" height="500" fill="#252526"/><line x1="60" y1="0" x2="60" y2="500" stroke="#555" stroke-width="2" stroke-dasharray="5,5"/><rect x="790" y="0" width="60" height="500" fill="#252526"/><line x1="790" y1="0" x2="790" y2="500" stroke="#555" stroke-width="2" stroke-dasharray="5,5"/><line x1="60" y1="4" x2="790" y2="4" stroke="white" stroke-width="4"/><line x1="64" y1="0" x2="64" y2="500" stroke="white" stroke-width="4"/><line x1="786" y1="0" x2="786" y2="500" stroke="white" stroke-width="4"/><line x1="60" y1="496" x2="790" y2="496" stroke="white" stroke-width="4"/><rect x="375" y="-6" width="100" height="10" fill="none" stroke="white" stroke-width="4"/><path d="M 225,0 A 150,150 0 0,0 375,150 L 475,150 A 150,150 0 0,0 625,0" stroke="white" stroke-width="4" fill="none"/><path d="M 135,0 A 240,240 0 0,0 355,240 L 495,240 A 240,240 0 0,0 715,0" stroke="white" stroke-width="3" stroke-dasharray="12,12" fill="none"/><line x1="410" y1="185" x2="440" y2="185" stroke="white" stroke-width="4"/><line x1="412" y1="100" x2="438" y2="100" stroke="white" stroke-width="3"/></g>';
+                var ys = [40, 110, 180, 250, 320, 390];
+                var pieces = [];
+                ys.forEach(y => pieces.push({x: 30, y: y, type: 'tri'}));
+                ys.forEach(y => pieces.push({x: 820, y: y, type: 'cir'}));
+                pieces.push({x: 820, y: 450, type: 'ball'});
+                if (mode === 'defense') pieces = pieces.map(p => ({x: 850 - p.x, y: 500 - p.y, type: p.type}));
+                createPieces(pieces);
+            }
+            setMode('move');
+        }
+
+        function createPieces(piecesData) {
+            piecesData.forEach(p => {
+                var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.setAttribute('class', 'draggable');
+                g.setAttribute('transform', 'translate(' + p.x + ', ' + p.y + ')');
+                var shape = '';
+                if (p.type === 'tri') shape = '<polygon points="0,-16 16,14 -16,14" fill="#2980b9" stroke="white" stroke-width="2"/>';
+                else if (p.type === 'cir') shape = '<circle r="17" fill="#e74c3c" stroke="white" stroke-width="2"/>';
+                else if (p.type === 'ball') shape = '<circle r="11" fill="#d35400" stroke="white" stroke-width="2"/>';
+                g.innerHTML = shape + '<circle r="35" class="touch-area" fill="transparent"/>';
+                courtGroup.appendChild(g);
+            });
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            svg.classList.remove('mode-drawing', 'mode-erasing');
+            if (mode === 'move') document.getElementById('btn-move').classList.add('active');
+            else if (mode === 'erase') {
+                document.getElementById('btn-clear').classList.add('active');
+                svg.classList.add('mode-erasing');
+            } else {
+                document.getElementById('btn-' + mode).classList.add('active');
+                svg.classList.add('mode-drawing');
+            }
+        }
+
+        function setFieldMode(mode) { renderCourt(mode); }
+
+        function getSVGCoords(e) {
+            var rect = svg.getBoundingClientRect();
+            var clientX = e.clientX, clientY = e.clientY;
+            if (e.touches && e.touches.length > 0) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+            else if (e.changedTouches && e.changedTouches.length > 0) { clientX = e.changedTouches[0].clientX; clientY = e.changedTouches[0].clientY; }
+            var vb = svg.viewBox.baseVal;
+            var x = ((clientX - rect.left) / rect.width) * vb.width + vb.x;
+            var y = ((clientY - rect.top) / rect.height) * vb.height + vb.y;
+            return { x: x, y: y };
+        }
+
+        function saveState() {
+            if (undoStack.length > 15) undoStack.shift();
+            undoStack.push(linesGroup.innerHTML);
+        }
+
+        function undo() {
+            if (undoStack.length > 0) linesGroup.innerHTML = undoStack.pop();
+        }
+
+        function handleStart(e) {
+            if (currentMode !== 'move' && currentMode !== 'erase') e.preventDefault();
+            var coords = getSVGCoords(e);
+            if (currentMode === 'move') {
+                var targetG = e.target.closest('.draggable');
+                if (targetG) {
+                    selectedElement = targetG;
+                    var transform = selectedElement.getAttribute('transform') || '';
+                    var match = transform.match(/translate\\(([^,)\\s]+)[, ]+([^)\\s]+)\\)/);
+                    var currentX = match ? parseFloat(match[1]) : 0;
+                    var currentY = match ? parseFloat(match[2]) : 0;
+                    transformX = coords.x - currentX;
+                    transformY = coords.y - currentY;
+                    courtGroup.appendChild(selectedElement);
+                    saveState();
+                }
+            } else if (currentMode === 'erase') {
+                var eraseTarget = e.target.closest('.tactical-line, .draggable');
+                if (eraseTarget) { saveState(); eraseTarget.remove(); }
+            } else if (currentMode === 'text') {
+                pendingTextX = coords.x;
+                pendingTextY = coords.y;
+                openTextModal();
+            } else {
+                e.preventDefault();
+                isDrawing = true;
+                startX = coords.x;
+                startY = coords.y;
+                saveState();
+                activePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                activePath.classList.add('tactical-line');
+                activePath.setAttribute("fill", "none");
+                activePath.setAttribute("stroke", (currentMode === 'line' || currentMode === 'straight') ? "#ffff00" : "#ff00ff");
+                activePath.setAttribute("stroke-width", "4");
+                activePath.setAttribute("stroke-linecap", "round");
+                if (currentMode === 'shot') {
+                    activePath.setAttribute("stroke", "#ff9f1a");
+                    activePath.setAttribute("stroke-width", "3");
+                }
+                if (currentMode === 'dash') activePath.setAttribute("stroke-dasharray", "10,10");
+                linesGroup.appendChild(activePath);
+                updateCurve(startX, startY);
+            }
+        }
+
+        function handleMove(e) {
+            if (currentMode !== 'move' && currentMode !== 'erase') e.preventDefault();
+            var coords = getSVGCoords(e);
+            if (selectedElement && currentMode === 'move') {
+                var newX = coords.x - transformX;
+                var newY = coords.y - transformY;
+                var maxX = fieldMode === 'transition' ? 985 : 835;
+                newX = Math.max(15, Math.min(newX, maxX));
+                newY = Math.max(15, Math.min(newY, 485));
+                selectedElement.setAttribute('transform', 'translate(' + newX + ', ' + newY + ')');
+            } else if (isDrawing && activePath) {
+                updateCurve(coords.x, coords.y);
+            }
+        }
+
+        function handleEnd() {
+            if (isDrawing && activePath) {
+                if (currentMode === 'line' || currentMode === 'straight') activePath.setAttribute("marker-end", "url(#arrow-yellow)");
+                else if (currentMode === 'dash') activePath.setAttribute("marker-end", "url(#arrow-pink)");
+            }
+            selectedElement = null;
+            isDrawing = false;
+            activePath = null;
+        }
+
+        function updateCurve(endX, endY) {
+            if (currentMode === 'shot') {
+                var sdx = endX - startX, sdy = endY - startY;
+                var sdist = Math.sqrt(sdx * sdx + sdy * sdy) || 1;
+                var ux = sdx / sdist, uy = sdy / sdist;
+                var nx2 = -uy, ny2 = ux;
+                var gap = 4;
+                var headLen = Math.min(24, sdist * 0.6);
+                var headHalf = Math.min(12, headLen * 0.55);
+                var bx = endX - ux * headLen, by = endY - uy * headLen;
+                var pt = (x, y) => x.toFixed(1) + ' ' + y.toFixed(1);
+                var d = 'M ' + pt(startX + nx2 * gap, startY + ny2 * gap) + ' L ' + pt(bx + nx2 * gap, by + ny2 * gap) + ' M ' + pt(startX - nx2 * gap, startY - ny2 * gap) + ' L ' + pt(bx - nx2 * gap, by - ny2 * gap) + ' M ' + pt(endX, endY) + ' L ' + pt(bx + nx2 * headHalf, by + ny2 * headHalf) + ' L ' + pt(bx - nx2 * headHalf, by - ny2 * headHalf) + ' Z';
+                activePath.setAttribute('d', d);
+            } else if (currentMode === 'straight') {
+                activePath.setAttribute('d', 'M ' + startX + ' ' + startY + ' L ' + endX + ' ' + endY);
+            } else if (currentMode === 'line') {
+                var dx = endX - startX, dy = endY - startY;
+                var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                var nx = -dy / dist, ny = dx / dist;
+                var midX = (startX + endX) / 2, midY = (startY + endY) / 2;
+                var centerX = fieldMode === 'transition' ? 500 : 425;
+                if (nx * (centerX - midX) + ny * (250 - midY) < 0) { nx = -nx; ny = -ny; }
+                var bend = Math.min(120, Math.max(55, dist * 0.30));
+                var c1X = startX + dx * 0.38 + nx * bend;
+                var c1Y = startY + dy * 0.38 + ny * bend;
+                var goalX = fieldMode === 'transition' ? (endX < 500 ? 50 : 950) : 425;
+                var goalY = fieldMode === 'transition' ? 250 : (fieldMode === 'defense' ? 500 : 0);
+                var gx = goalX - endX, gy = goalY - endY;
+                var gLen = Math.sqrt(gx * gx + gy * gy) || 1;
+                var tangentLength = Math.max(55, Math.min(120, gLen * 0.25));
+                var c2X = endX - (gx / gLen) * tangentLength;
+                var c2Y = endY - (gy / gLen) * tangentLength;
+                activePath.setAttribute('d', 'M ' + startX + ' ' + startY + ' C ' + c1X + ' ' + c1Y + ', ' + c2X + ' ' + c2Y + ', ' + endX + ' ' + endY);
+            } else {
+                activePath.setAttribute('d', 'M ' + startX + ' ' + startY + ' L ' + endX + ' ' + endY);
+            }
+        }
+
+        function resetDrawing() { saveState(); linesGroup.innerHTML = ""; setMode("move"); }
+
+        function openTextModal() {
+            document.getElementById('text-modal').style.display = 'flex';
+            var input = document.getElementById('text-input');
+            input.value = '';
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function cancelText() {
+            document.getElementById('text-modal').style.display = 'none';
+            setMode('text');
+        }
+
+        function confirmText() {
+            var textValue = document.getElementById('text-input').value.trim();
+            if (textValue) {
+                saveState();
+                var textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                textEl.classList.add('draggable');
+                textEl.setAttribute('x', pendingTextX);
+                textEl.setAttribute('y', pendingTextY);
+                textEl.setAttribute('fill', '#ffffff');
+                textEl.setAttribute('font-size', '24');
+                textEl.setAttribute('font-family', 'Arial, sans-serif');
+                textEl.setAttribute('font-weight', 'bold');
+                textEl.setAttribute('text-anchor', 'middle');
+                textEl.setAttribute('dominant-baseline', 'middle');
+                textEl.innerHTML = textValue + '<circle r="35" class="touch-area" fill="transparent"/>';
+                linesGroup.appendChild(textEl);
+            }
+            cancelText();
+        }
+
+        function buildImage(done) {
+            var svgData = new XMLSerializer().serializeToString(svg);
+            var canvas = document.createElement("canvas");
+            var description = document.getElementById("exercise-text").value.trim();
+            var imageWidth = fieldMode === 'transition' ? 1000 : 850;
+            var imageHeight = 500;
+            canvas.width = imageWidth;
+            canvas.height = description ? imageHeight + 120 : imageHeight;
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#3b6e51";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            var img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0);
+                if (description) {
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(0, imageHeight, imageWidth, 120);
+                    ctx.fillStyle = "#222222";
+                    ctx.font = "bold 16px Arial";
+                    ctx.fillText("Descripción:", 20, imageHeight + 25);
+                    ctx.font = "14px Arial";
+                    var words = description.split(' ');
+                    var line = '', y = imageHeight + 50;
+                    for (var n = 0; n < words.length; n++) {
+                        var testLine = line + words[n] + ' ';
+                        var metrics = ctx.measureText(testLine);
+                        if (metrics.width > imageWidth - 40 && n > 0) {
+                            ctx.fillText(line, 20, y);
+                            line = words[n] + ' ';
+                            y += 20;
+                        } else { line = testLine; }
+                    }
+                    ctx.fillText(line, 20, y);
+                }
+                done(canvas);
+            };
+        }
+
+        function saveAsImage() {
+            buildImage(function(canvas) {
+                var a = document.createElement("a");
+                a.download = "ejercicio_balonmano.png";
+                a.href = canvas.toDataURL("image/png");
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
+        }
+
+        function exportPDF() {
+            const element = document.getElementById('hoja');
+            const opt = {
+                margin: 10,
+                filename: 'Hoja_de_Sesion.pdf',
+                image: { type: 'jpeg', quality: 0.95 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            const btn = document.querySelector('.btn-pdf');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ Generando...";
+            html2pdf().set(opt).from(element).save().then(() => { btn.innerText = originalText; });
+        }
+
+        function saveSessionAsHTML() {
+            alert('Función disponible en la versión principal. Esta es una sesión guardada.');
+        }
+
+        function saveToRepository() {
+            buildImage(function(canvas) {
+                const sessionData = {
+                    id: Date.now(),
+                    date: new Date().toLocaleDateString(),
+                    mode: fieldMode,
+                    image: canvas.toDataURL('image/png'),
+                    description: document.getElementById('exercise-text').value
+                };
+                let repo = JSON.parse(localStorage.getItem('handballRepoV2') || '[]');
+                repo.push(sessionData);
+                localStorage.setItem('handballRepoV2', JSON.stringify(repo));
+                alert('✅ Ejercicio guardado en el Repositorio Local.');
+            });
+        }
+
+        function generateExerciseSlots(count) {
+            const container = document.getElementById('exercises-container');
+            let html = '';
+            for (let i = 1; i <= count; i++) {
+                html += '<table class="exercise-table"><thead><tr><th width="65%">Gráfico</th><th width="35%">Orientaciones/consignas</th></tr></thead><tbody><tr><td class="col-graph"><div class="image-uploader"><span class="placeholder-text">🖼 EJERCICIO ' + i + '<br>Subir imagen o enviar</span><input type="file" accept="image/*" onchange="loadImage(event, this)"><img class="loaded-image" alt="Gráfico ' + i + '"></div></td><td class="col-orient"><textarea placeholder="Consignas técnicas/tácticas..."></textarea></td></tr></tbody></table>';
+            }
+            container.innerHTML = html;
+            initTargetSelect();
+        }
+
+        function loadImage(event, input) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const uploader = input.closest('.image-uploader');
+            const img = uploader.querySelector('.loaded-image');
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                img.src = e.target.result;
+                img.style.display = 'block';
+                uploader.querySelector('.placeholder-text').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function initTargetSelect() {
+            var sel = document.getElementById('target-ex');
+            sel.innerHTML = '';
+            const slots = document.querySelectorAll('.image-uploader');
+            slots.forEach((slot, index) => {
+                var o = document.createElement('option');
+                o.value = index;
+                o.textContent = 'Ejercicio ' + (index + 1);
+                sel.appendChild(o);
+            });
+        }
+
+        function sendToSheet() {
+            var targetIndex = parseInt(document.getElementById('target-ex').value);
+            var uploaders = document.querySelectorAll('.image-uploader');
+            if (targetIndex >= uploaders.length) return;
+            var uploader = uploaders[targetIndex];
+            buildImage(function(canvas) {
+                var img = uploader.querySelector('.loaded-image');
+                img.src = canvas.toDataURL('image/png');
+                img.style.display = 'block';
+                uploader.querySelector('.placeholder-text').style.display = 'none';
+                var textarea = uploader.closest('tr').querySelector('textarea');
+                textarea.value = document.getElementById('exercise-text').value;
+                document.getElementById('hoja').scrollIntoView({behavior: 'smooth'});
+            });
+        }
+
+        window.onload = init;
+    <\/script>
+</body>
+</html>`;
+
+            // 5. Descargar
+            const blob = new Blob([htmlCompleto], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombreArchivo;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
         /* ===== REPOSITORIO ===== */
         function saveToRepository() {
             buildImage(function(canvas) {
@@ -907,8 +1755,4 @@
     </script>
 </body>
 </html>
-           
-   
-    
-        
-                
+      
